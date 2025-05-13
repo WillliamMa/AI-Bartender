@@ -1,0 +1,65 @@
+name: Web App CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    env:
+      SECRET_KEY: dev-secret
+
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-cov openai==0.28.1
+
+      - name: Run tests with coverage
+        working-directory: backend
+        run: |
+          pytest --cov=app
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/webapp:latest .
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Push Docker image to Docker Hub
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/webapp:latest
+        
+      - name: Trigger Deployment on DigitalOcean
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          APP_ID: ${{ secrets.DO_APP_ID }}
+        run: |
+          curl -X POST "https://api.digitalocean.com/v2/apps/${APP_ID}/deployments" \
+          -H "Authorization: Bearer ${DO_API_TOKEN}" \
+          -H "Content-Type: application/json"

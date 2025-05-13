@@ -1,0 +1,92 @@
+{% extends "layout.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<h2>My Bar Inventory</h2>
+
+<label for="filter-category">Filter by Category:</label>
+<select id="filter-category">
+  <option value="">All</option>
+  <option value="Liquor">Liquor</option>
+  <option value="Liqueur">Liqueur</option>
+  <option value="Mixer">Mixer</option>
+  <option value="Juice">Juice</option>
+  <option value="Fruit">Fruit</option>
+  <option value="Syrup">Syrup</option>
+  <option value="Garnish">Garnish</option>
+  <option value="Bitters">Bitters</option>
+  <option value="Other">Other</option>
+</select>
+
+<form id="add-item-form">
+  <input type="text" id="name" placeholder="Ingredient name" required />
+  
+  <select id="category" required>
+    <option value="" disabled selected>Choose category</option>
+    <option value="Liquor">Liquor</option>
+    <option value="Liqueur">Liqueur</option>
+    <option value="Mixer">Mixer</option>
+    <option value="Juice">Juice</option>
+    <option value="Fruit">Fruit</option>
+    <option value="Syrup">Syrup</option>
+    <option value="Garnish">Garnish</option>
+    <option value="Bitters">Bitters</option>
+    <option value="Other">Other</option>
+  </select>
+
+  <input type="date" id="expiration_date" />
+  <button type="submit">Add to Inventory</button>
+</form>
+
+<ul id="inventory-list" class="scrollable-list"></ul>
+
+<script>
+  function loadInventory() {
+    const selectedCategory = document.getElementById("filter-category").value;
+    fetch("/api/inventory/")
+      .then(res => res.json())
+      .then(data => {
+        const list = document.getElementById("inventory-list");
+        list.innerHTML = "";
+
+        const filtered = selectedCategory
+          ? data.filter(item => item.category === selectedCategory)
+          : data;
+
+        filtered.forEach(item => {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            ${item.name} (${item.category})
+            <button onclick="deleteItem('${item.name}')">❌</button>
+          `;
+          list.appendChild(li);
+        });
+      });
+  }
+
+  function deleteItem(name) {
+    fetch(`/api/inventory/${encodeURIComponent(name)}`, {
+      method: "DELETE"
+    }).then(() => loadInventory());
+  }
+
+  document.getElementById("add-item-form").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const name = document.getElementById("name").value;
+    const category = document.getElementById("category").value;
+    const expiration = document.getElementById("expiration_date").value || null;
+
+    fetch("/api/inventory/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, category, expiration_date: expiration })
+    }).then(() => {
+      document.getElementById("add-item-form").reset();
+      loadInventory();
+    });
+  });
+
+  document.getElementById("filter-category").addEventListener("change", loadInventory);
+
+  loadInventory();
+</script>
+{% endblock %}

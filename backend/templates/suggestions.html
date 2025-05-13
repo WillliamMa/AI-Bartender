@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>What Can You Make? 🍸</h2>
+
+<ul id="suggestion-list" class="scrollable-list"></ul>
+
+<script>
+  fetch("/api/suggestions/available")
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById("suggestion-list");
+      list.innerHTML = "";
+
+      if (data.length === 0) {
+        list.innerHTML = "<li>No matching cocktails found. Try adding more ingredients!</li>";
+      }
+
+      data['matched'].forEach(drink => {
+        const item = document.createElement("li");
+        console.log(drink.name);
+        item.innerHTML = `
+          <h1>${drink.name}</h1>
+          ✅ You have: ${drink.matched.join(", ")}<br/>
+          ❌ Missing: ${drink.missing.join(", ") || "None"}<br/>
+          <em>${drink.instructions}</em><br/><br/>
+        `;
+        if (data.user_logged) {
+          const saveButton = document.createElement("button");
+          saveButton.id = "saveButton";
+          saveButton.textContent = "Save to Favorites";
+          saveButton.addEventListener("click", () => {
+            fetch("/api/favorites/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: drink.name,
+                ingredients: drink.ingredients,
+                instructions: drink.instructions
+              })
+            })
+            .then(response => {
+              if (response.ok) {
+                item.innerHTML += "<br>Saved to favorites!";
+                saveButton.remove();
+              } else {
+                alert("Failed to save favorite.");
+              }
+            });
+          });          
+          item.appendChild(saveButton);
+        }
+        list.appendChild(item);
+      });
+    });
+</script>
+
+{% endblock %}
